@@ -1,0 +1,13 @@
+{
+  "name": "Backend",
+  "dockerComposeFile": ["../../docker-compose.yaml"],
+  "service": "backend",
+  "shutdownAction": "none",
+  "workspaceFolder": "/app",
+  "remoteEnv": {
+    "HOST_PROJECT_PATH": "${localWorkspaceFolder}"
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached"
+  ]
+}
