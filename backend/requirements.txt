@@ -1,0 +1,11 @@
+pyjwt
+boto3==1.36.21
+fastapi==0.115.8
+mangum==0.19.0
+pillow==11.1.0
+python-dotenv==1.0.1
+qrcode==8.0
+uuid==1.30
+uvicorn==0.34.0
+python-multipart
+requests
