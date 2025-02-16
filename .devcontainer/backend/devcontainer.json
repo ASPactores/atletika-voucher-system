@@ -8,6 +8,6 @@
     "HOST_PROJECT_PATH": "${localWorkspaceFolder}"
   },
   "mounts": [
-    "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached"
+    "source=${localWorkspaceFolder}/backend,target=/app,type=bind,consistency=cached"
   ]
 }
