@@ -1,20 +1,40 @@
 import io
-import os
 import qrcode
 from PIL import Image
 from fastapi import HTTPException
+from datetime import datetime
+from infrastructure.s3 import retrieve_template
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 
 
-def generate_qr_code(unique_id: str):
+def generate_qr_code(unique_id: str, expiry_date: str) -> io.BytesIO:
     try:
-        file = "voucher-atletika.jpg"
+        # Fetch the image from S3 as bytes
+        img_bytes = retrieve_template("voucher-atletika.png")
+        base_image = Image.open(io.BytesIO(img_bytes))
 
-        # Ensure the file exists
-        if not os.path.exists(file):
-            raise FileNotFoundError(f"Background image '{file}' not found.")
+        # Ensure PNG is in RGB mode
+        if base_image.mode in ("RGBA", "LA"):
+            white_bg = Image.new("RGB", base_image.size, (255, 255, 255))
+            white_bg.paste(
+                base_image, mask=base_image.split()[3]
+            )  # Apply alpha channel as mask
+            base_image = white_bg
 
-        image = Image.open(file)
+        img_width, img_height = base_image.size
 
+        image_io = io.BytesIO()
+        base_image.save(image_io, format="PNG", optimize=True)
+        image_io.seek(0)
+        image_reader = ImageReader(image_io)
+
+        pdf_io = io.BytesIO()
+        pdf_canvas = canvas.Canvas(pdf_io, pagesize=(img_width, img_height))
+
+        pdf_canvas.drawImage(image_reader, 0, 0, width=img_width, height=img_height)
+
+        # Generate QR Code
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -25,19 +45,33 @@ def generate_qr_code(unique_id: str):
         qr.make(fit=True)
         qr_img = qr.make_image(fill="black", back_color="white")
 
-        # Resize QR code to fit the white space (assuming a predefined size)
-        qr_size = (500, 500)
-        qr_img = qr_img.resize(qr_size, Image.Resampling.LANCZOS)
+        qr_size = 515
+        qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
 
-        # Paste QR code onto the image at the predefined white space location
-        image.paste(qr_img, (29, 43))
+        # Convert QR code to ImageReader
+        qr_io = io.BytesIO()
+        qr_img.save(qr_io, format="PNG")
+        qr_io.seek(0)
+        qr_reader = ImageReader(qr_io)
 
-        # Save to a BytesIO stream
-        img_io = io.BytesIO()
-        image.save(img_io, format="JPEG")
-        img_io.seek(0)
+        # Position QR Code
+        qr_x = 22
+        qr_y = 43
+        pdf_canvas.drawImage(qr_reader, qr_x, qr_y, width=qr_size, height=qr_size)
 
-        return img_io
+        expiry_dt = datetime.fromisoformat(expiry_date)
+        formatted_date = expiry_dt.strftime("%B %d, %Y")
+
+        pdf_canvas.setFont("Helvetica-Bold", 20)
+        text_x = 960
+        text_y = 80
+        pdf_canvas.drawString(text_x, text_y, formatted_date)
+
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+
+        pdf_io.seek(0)
+        return pdf_io
 
     except FileNotFoundError as fe:
         raise HTTPException(status_code=404, detail=str(fe))
@@ -49,5 +83,5 @@ def generate_qr_code(unique_id: str):
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"QR code generation failed: {str(e)}"
+            status_code=500, detail=f"QR code PDF generation failed: {str(e)}"
         )
