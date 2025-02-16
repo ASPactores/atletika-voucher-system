@@ -1,14 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException
-from services.voucher_service import create_voucher, claim_voucher, get_all_vouchers
+from services.voucher_service import (
+    create_voucher,
+    claim_voucher,
+    get_all_vouchers,
+    get_voucher,
+)
 from domain.models import (
     VoucherDetails,
     ClaimVoucherRequest,
     GenericResponse,
     VoucherList,
+    VoucherResponse,
 )
-from infrastructure.aws_cognito import verify_token
+from infrastructure.cognito import verify_token
 from botocore.exceptions import ClientError, BotoCoreError
 from fastapi.responses import StreamingResponse
+
 
 router = APIRouter()
 
@@ -21,14 +28,23 @@ async def generate_voucher(
         voucher = create_voucher(
             voucher_details.first_name,
             voucher_details.last_name,
+            voucher_details.expiry_date,
             voucher_details.percentage,
         )
-        return StreamingResponse(content=voucher, media_type="image/jpeg")
+        return StreamingResponse(
+            content=voucher,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=Atletika_Voucher.pdf"
+            },
+        )
 
     except ClientError as ce:
         raise HTTPException(
             status_code=500, detail=f"DynamoDB error: {ce.response['Error']['Message']}"
         )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except BotoCoreError as be:
         raise HTTPException(status_code=503, detail=f"AWS service error: {str(be)}")
     except HTTPException as he:
@@ -82,6 +98,23 @@ async def get_vouchers(token: str = Depends(verify_token)):
         )
     except BotoCoreError as be:
         raise HTTPException(status_code=503, detail=f"AWS service error: {str(be)}")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+
+@router.get("/{voucher_id}", response_model=VoucherResponse)
+async def get_single_voucher(voucher_id: str, token: str = Depends(verify_token)):
+    try:
+        voucher = get_voucher(voucher_id)
+        return voucher
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except ClientError as ce:
+        raise HTTPException(
+            status_code=500, detail=f"DynamoDB error: {ce.response['Error']['Message']}"
+        )
     except HTTPException as he:
         raise he
     except Exception as e:
