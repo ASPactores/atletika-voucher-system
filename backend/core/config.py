@@ -13,6 +13,7 @@ class Config:
     COGNITO_CLIENT_SECRET = os.getenv("COGNITO_CLIENT_SECRET")
     COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID")
     COGNITO_KEYS_URL = os.getenv("COGNITO_KEYS_URL")
+    S3_BUCKET = os.getenv("S3_BUCKET")
 
 
 config = Config()
