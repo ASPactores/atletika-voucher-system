@@ -1,4 +1,4 @@
-from infrastructure.aws_cognito import client
+from infrastructure.cognito import client
 from core.config import config
 from domain.models import LoginRequest, LoginResponse, LogoutRequest, GenericResponse
 import hmac
